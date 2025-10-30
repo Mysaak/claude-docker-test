@@ -1,17 +1,25 @@
-# Claude Docker Test Project
+# Claude Docker Test Project - Full-Stack TODO Application
 
 ## Popis projektu
-Testovací projekt pro nastavení vývojového prostředí s Docker, Node.js a PostgreSQL. Slouží jako demonstrace a verifikace kompletního vývojového stacku.
+Full-stack TODO aplikace postavená na Docker, Node.js, Express, PostgreSQL a Vanilla JavaScript. Demonstruje kompletní vývojový stack s moderním frontendem a REST API backendem.
 
 ## Tech Stack
+
+### Frontend
+- **HTML5** (sémantický markup)
+- **Tailwind CSS** (utility-first CSS framework)
+- **Vanilla JavaScript** (žádné frameworky, čistý ES6+)
+- **Fetch API** (komunikace s backendem)
 
 ### Backend
 - **Node.js** (runtime)
 - **Express.js** (web framework)
-- **pg** (PostgreSQL client pro Node.js)
+- **pg** (PostgreSQL client)
+- **cors** (Cross-Origin Resource Sharing middleware)
 
 ### Databáze
 - **PostgreSQL 16** (relační databáze)
+- **SQL Migrations** (automatické vytvoření schématu)
 - Běží v Docker containeru
 - Volumes pro persistenci dat
 
@@ -23,47 +31,258 @@ Testovací projekt pro nastavení vývojového prostředí s Docker, Node.js a P
 ## Architektura
 
 ```
-┌─────────────────────────────────────────┐
-│         Lokální Development             │
-├─────────────────────────────────────────┤
-│                                         │
-│  Node.js Server (localhost:3000)       │
-│  ├── Express.js API                     │
-│  ├── PostgreSQL Client (pg)            │
-│  └── Health Check Endpoints            │
-│           │                             │
-│           │ TCP 5432                    │
-│           ▼                             │
-│  ┌────────────────────────────┐        │
-│  │ Docker Container           │        │
-│  │  PostgreSQL 16             │        │
-│  │  - Port: 5432              │        │
-│  │  - Volume: postgres-data   │        │
-│  │  - Health checks           │        │
-│  └────────────────────────────┘        │
-│                                         │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│           Full-Stack TODO Application               │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  Frontend (Browser)                                 │
+│  ├── index.html (Tailwind CSS)                      │
+│  └── app.js (Vanilla JavaScript)                    │
+│           │                                         │
+│           │ HTTP/JSON (Fetch API)                   │
+│           ▼                                         │
+│  ┌──────────────────────────────────────┐          │
+│  │ Node.js Server (localhost:3000)       │          │
+│  │  ├── Express.js REST API             │          │
+│  │  ├── CORS Middleware                 │          │
+│  │  ├── Static File Serving             │          │
+│  │  └── PostgreSQL Client (pg)          │          │
+│  └──────────────────────────────────────┘          │
+│           │                                         │
+│           │ TCP 5432                                │
+│           ▼                                         │
+│  ┌──────────────────────────────────────┐          │
+│  │ Docker Container                      │          │
+│  │  PostgreSQL 16                        │          │
+│  │  ├── Port: 5432                       │          │
+│  │  ├── Volume: postgres-data            │          │
+│  │  ├── Volume: migrations (init)        │          │
+│  │  ├── Health checks                    │          │
+│  │  └── Database: testdb                 │          │
+│  │      └── Table: todos                 │          │
+│  └──────────────────────────────────────┘          │
+│                                                     │
+└─────────────────────────────────────────────────────┘
 ```
 
 ## Struktura projektu
 
 ```
 claude-docker-test/
-├── Claude.MD              # Tato dokumentace (interní)
-├── README.md              # Uživatelská dokumentace
-├── docker-compose.yml     # Konfigurace Docker služeb
-├── package.json           # Node.js dependencies a skripty
-├── server.js              # Express server s DB připojením
-├── .env.example           # Template pro environment variables
-├── .gitignore            # Git ignore pravidla
-└── postgres-data/        # PostgreSQL data (v .gitignore)
+├── Claude.MD                  # Tato dokumentace (interní)
+├── README.md                  # Uživatelská dokumentace
+├── docker-compose.yml         # Konfigurace Docker služeb
+├── package.json               # Node.js dependencies a skripty
+├── server.js                  # Express server + REST API
+├── .env.example               # Template pro environment variables
+├── .gitignore                # Git ignore pravidla
+├── migrations/               # SQL migration skripty
+│   └── 001_create_todos.sql  # Vytvoření todos tabulky
+├── public/                   # Frontend soubory (static)
+│   ├── index.html            # UI aplikace (Tailwind CSS)
+│   └── app.js                # Frontend logika (Vanilla JS)
+└── postgres-data/            # PostgreSQL data (v .gitignore)
 ```
+
+## Databázové Schéma
+
+### Tabulka `todos`
+```sql
+CREATE TABLE todos (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    completed BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_todos_created_at ON todos(created_at DESC);
+```
+
+**Pole:**
+- `id` - Unikátní identifikátor (auto-increment)
+- `title` - Text úkolu (max 255 znaků)
+- `completed` - Stav dokončení (true/false)
+- `created_at` - Čas vytvoření (automaticky)
+
+## REST API Dokumentace
+
+### Base URL
+```
+http://localhost:3000/api
+```
+
+### Endpointy
+
+#### 1. GET /api/todos
+Vrátí seznam všech todos seřazených podle data vytvoření (nejnovější první).
+
+**Response:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": 1,
+      "title": "Vytvořit TODO aplikaci",
+      "completed": false,
+      "created_at": "2025-10-30T12:00:00.000Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+#### 2. POST /api/todos
+Vytvoří nový todo úkol.
+
+**Request Body:**
+```json
+{
+  "title": "Nový úkol"
+}
+```
+
+**Validace:**
+- `title` je povinný
+- `title` nesmí být prázdný
+- `title` max 255 znaků
+
+**Response (201 Created):**
+```json
+{
+  "status": "success",
+  "message": "Todo created successfully",
+  "data": {
+    "id": 2,
+    "title": "Nový úkol",
+    "completed": false,
+    "created_at": "2025-10-30T12:05:00.000Z"
+  }
+}
+```
+
+**Error (400 Bad Request):**
+```json
+{
+  "status": "error",
+  "message": "Title is required and cannot be empty"
+}
+```
+
+#### 3. PATCH /api/todos/:id
+Přepne completed status todo úkolu (toggle).
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Todo updated successfully",
+  "data": {
+    "id": 1,
+    "title": "Vytvořit TODO aplikaci",
+    "completed": true,
+    "created_at": "2025-10-30T12:00:00.000Z"
+  }
+}
+```
+
+**Error (404 Not Found):**
+```json
+{
+  "status": "error",
+  "message": "Todo not found"
+}
+```
+
+#### 4. DELETE /api/todos/:id
+Smaže todo úkol.
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Todo deleted successfully"
+}
+```
+
+**Error (404 Not Found):**
+```json
+{
+  "status": "error",
+  "message": "Todo not found"
+}
+```
+
+### Utility Endpointy
+
+#### GET /health
+Health check serveru.
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-10-30T12:34:56.789Z"
+}
+```
+
+#### GET /api/test
+Test databázového připojení.
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Database connection successful",
+  "timestamp": "2025-10-30T12:34:56.789Z",
+  "database": {
+    "version": "PostgreSQL 16.10..."
+  }
+}
+```
+
+## Frontend UI
+
+### Komponenty
+
+**Header:**
+- Název aplikace "Todo App"
+- Popis
+
+**Add Todo Form:**
+- Input field s placeholderem "Co potřebuješ udělat?"
+- Tlačítko "Přidat"
+- Validace na max 255 znaků
+
+**Stats Panel:**
+- Celkem todos
+- Zbývá (nehotové)
+- Hotovo (completed)
+
+**Todo List:**
+- Každý item obsahuje:
+  - Checkbox pro toggle completed
+  - Text úkolu (přeškrtnutý pokud completed)
+  - Tlačítko "Smazat"
+- Animace při přidání
+- Empty state pokud žádné todos
+
+**Error Handling:**
+- Error zprávy s auto-hide (5s)
+- Loading indicator během operací
+
+**Design:**
+- Gradient pozadí (blue-indigo)
+- Tailwind CSS komponenty
+- Responzivní (mobile-first)
+- Moderní shadow efekty
+- Smooth animace
 
 ## Jak spustit
 
 ### 1. Prerekvizity
-- Docker a Docker Compose nainstalované
-- Node.js (doporučeno v18 nebo vyšší)
+- Docker a Docker Compose
+- Node.js (v18 nebo vyšší)
 - Git a GitHub CLI
 
 ### 2. Instalace závislostí
@@ -75,6 +294,8 @@ npm install
 ```bash
 docker compose up -d
 ```
+
+Migrations se spustí automaticky při prvním startu PostgreSQL.
 
 ### 4. Ověření že PostgreSQL běží
 ```bash
@@ -89,75 +310,31 @@ npm run dev
 
 Server poběží na `http://localhost:3000`
 
-## API Endpointy
-
-### GET /health
-Health check endpoint serveru.
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "timestamp": "2025-10-30T12:34:56.789Z"
-}
-```
-
-### GET /api/test
-Testuje připojení k PostgreSQL databázi.
-
-**Response (úspěch):**
-```json
-{
-  "status": "success",
-  "message": "Database connection successful",
-  "timestamp": "2025-10-30T12:34:56.789Z",
-  "database": {
-    "version": "PostgreSQL 16.x"
-  }
-}
-```
-
-**Response (chyba):**
-```json
-{
-  "status": "error",
-  "message": "Database connection failed: error details"
-}
-```
-
-## Příkazy a troubleshooting
-
-### Docker příkazy
+### 6. Otevření v prohlížeči
 ```bash
-# Spustit služby
-docker compose up -d
+# Automaticky se otevře index.html
+open http://localhost:3000
+```
 
-# Zastavit služby
-docker compose down
+## Příkazy
 
-# Zobrazit logy
-docker compose logs -f postgres
+### Development
+```bash
+npm run dev      # Spustí server s nodemon (auto-reload)
+npm start        # Spustí server v production módu
+```
 
-# Restartovat služby
-docker compose restart
+### Docker
+```bash
+docker compose up -d        # Spustit služby na pozadí
+docker compose down         # Zastavit služby
+docker compose logs -f      # Zobrazit logy
+docker compose ps           # Zobrazit běžící kontejnery
+docker compose restart      # Restartovat služby
 
-# Odstranit všechno včetně volumes (POZOR: smaže data!)
+# Restartovat s novými migrations (smaže data!)
 docker compose down -v
-
-# Vstoupit do PostgreSQL containeru
-docker compose exec postgres psql -U postgres
-```
-
-### Node.js příkazy
-```bash
-# Instalace závislostí
-npm install
-
-# Spuštění v dev módu (s nodemon)
-npm run dev
-
-# Spuštění v production módu
-npm start
+docker compose up -d
 ```
 
 ### Testování API
@@ -165,59 +342,44 @@ npm start
 # Health check
 curl http://localhost:3000/health
 
-# Database test
-curl http://localhost:3000/api/test
+# Get all todos
+curl http://localhost:3000/api/todos
 
-# S formátovaným výstupem (jq)
-curl http://localhost:3000/api/test | jq
+# Create todo
+curl -X POST http://localhost:3000/api/todos \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Test úkol"}'
+
+# Toggle completed
+curl -X PATCH http://localhost:3000/api/todos/1
+
+# Delete todo
+curl -X DELETE http://localhost:3000/api/todos/1
 ```
 
 ## Troubleshooting
 
-### Problem: Docker kontejner nejde spustit
+### Problem: Migrations se nespustily
 ```bash
-# Zkontrolujte Docker daemon
-docker ps
-
-# Zkontrolujte logy
+# Zkontrolujte logy PostgreSQL
 docker compose logs postgres
 
-# Restartujte Docker Desktop (pokud používáte)
-```
-
-### Problem: Server se nemůže připojit k databázi
-```bash
-# 1. Ověřte že PostgreSQL běží
-docker compose ps
-
-# 2. Zkontrolujte environment variables
-cat .env
-
-# 3. Zkontrolujte connection string v server.js
-
-# 4. Zkontrolujte network v Dockeru
-docker network ls
-```
-
-### Problem: Port 5432 je již obsazený
-```bash
-# Zjistěte co běží na portu 5432
-lsof -i :5432
-
-# Nebo změňte port v docker-compose.yml:
-ports:
-  - "5433:5432"  # Změní externí port na 5433
-```
-
-### Problem: Permission denied na postgres-data/
-```bash
-# Nastavte správná oprávnění
-sudo chown -R $USER:$USER postgres-data/
-
-# Nebo smažte a nechte Docker vytvořit znovu
+# Znovu vytvořte databázi (POZOR: smaže data!)
 docker compose down -v
-rm -rf postgres-data/
 docker compose up -d
+```
+
+### Problem: CORS chyby v prohlížeči
+- Ujistěte se že server běží na http://localhost:3000
+- CORS je povolený pro všechny originy v development
+
+### Problem: Frontend se nenačítá
+```bash
+# Zkontrolujte že public/ složka existuje
+ls -la public/
+
+# Zkontrolujte server logy
+npm run dev
 ```
 
 ## Environment Variables
@@ -229,18 +391,44 @@ cp .env.example .env
 ```
 
 Proměnné:
-- `POSTGRES_USER` - PostgreSQL uživatel (default: postgres)
-- `POSTGRES_PASSWORD` - PostgreSQL heslo (default: postgres)
-- `POSTGRES_DB` - název databáze (default: testdb)
+- `DB_USER` - PostgreSQL uživatel (default: postgres)
+- `DB_PASSWORD` - PostgreSQL heslo (default: postgres)
+- `DB_NAME` - název databáze (default: testdb)
 - `DB_HOST` - host databáze (default: localhost)
 - `DB_PORT` - port databáze (default: 5432)
+- `PORT` - port serveru (default: 3000)
+
+## Bezpečnost
+
+### Implementováno:
+- ✅ XSS ochrana (escapeHtml v frontendu)
+- ✅ SQL injection ochrana (parametrizované queries)
+- ✅ Input validace (server-side i client-side)
+- ✅ CORS konfigurace
+- ✅ Error handling bez leak citlivých info
+
+### TODO pro production:
+- ⚠️ Authentikace a autorizace
+- ⚠️ Rate limiting
+- ⚠️ HTTPS
+- ⚠️ Environment variables pro credentials
+- ⚠️ Content Security Policy
+- ⚠️ Helmet.js middleware
+
+## Performance
+
+- PostgreSQL indexy na created_at
+- Connection pooling pro databázi
+- Static file caching (Express)
+- Optimistické UI updates ve frontendu
 
 ## Poznámky
 
 - PostgreSQL data jsou persistentní díky Docker volumes
 - Server běží lokálně (ne v containeru) pro snadnější development
-- Health checks v docker-compose.yml zajišťují že PostgreSQL je ready před použitím
-- Používáme nodemon pro automatický restart při změnách kódu
+- Health checks zajišťují že PostgreSQL je ready
+- Nodemon pro automatický restart při změnách kódu
+- Vanilla JS bez závislostí na frameworky (lightweight)
 
 ## Autor
 Vytvořeno pomocí Claude Code
